@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>오늘의 건강식단 AI</title>
+<style>
+  :root {
+    --primary: #2d7a4f;
+    --primary-light: #4CAF7C;
+    --primary-dark: #1a5c38;
+    --accent: #81c784;
+    --bg: #f7f5f0;
+    --bg-card: #ffffff;
+    --beige: #f5f0e8;
+    --beige-dark: #e8e0d0;
+    --text: #2c2c2c;
+    --text-muted: #6b6b6b;
+    --text-light: #999;
+    --border: #e0dbd0;
+    --shadow: 0 2px 12px rgba(45,122,79,0.1);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Noto Sans KR', BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    position: relative;
+    padding-bottom: 80px;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+    color: white;
+    padding: 20px 20px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 20px; font-weight: 700; }
+  .header-date { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+  .header-badge {
+    background: rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* Bottom Nav */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    background: white;
+    border-top: 1px solid var(--border);
+    display: flex;
+    z-index: 200;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 4px;
+    cursor: pointer;
+    transition: color 0.2s;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: 10px;
+    gap: 3px;
+  }
+  .nav-item.active { color: var(--primary); }
+  .nav-item .nav-icon { font-size: 20px; line-height: 1; }
+
+  /* Content */
+  .content { padding: 16px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title span { font-size: 18px; }
+
+  /* Briefing */
+  .briefing-card {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+  .briefing-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 8px; opacity: 0.9; }
+  .briefing-message {
+    font-size: 14px;
+    line-height: 1.6;
+    background: rgba(255,255,255,0.15);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .briefing-stats { display: flex; gap: 8px; }
+  .stat-badge {
+    flex: 1;
+    background: rgba(255,255,255,0.2);
+    border-radius: var(--radius-sm);
+    padding: 8px;
+    text-align: center;
+  }
+  .stat-badge .val { font-size: 18px; font-weight: 700; }
+  .stat-badge .lbl { font-size: 10px; opacity: 0.85; margin-top: 2px; }
+
+  /* Ingredient List */
+  .ingredient-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .ingredient-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .ingredient-emoji { font-size: 32px; flex-shrink: 0; }
+  .ingredient-info { flex: 1; }
+  .ingredient-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .ingredient-reason { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .tag {
+    background: var(--beige);
+    color: var(--primary-dark);
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag.green { background: #e8f5e9; color: var(--primary-dark); }
+  .tag.blue { background: #e3f2fd; color: #1565c0; }
+  .tag.orange { background: #fff3e0; color: #e65100; }
+  .kcal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  /* Recipe Cards */
+  .recipe-card {
+    background: var(--beige);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid var(--beige-dark);
+  }
+  .recipe-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .recipe-name { font-size: 15px; font-weight: 700; }
+  .recipe-kcal { font-size: 13px; font-weight: 700; color: var(--primary); }
+  .recipe-meta { display: flex; gap: 8px; margin-bottom: 8px; }
+  .meta-chip {
+    font-size: 11px;
+    background: white;
+    border-radius: 20px;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .recipe-reason { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+  .recipe-ingredients { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+
+  /* Nutrition Bar */
+  .nutrition-row { margin-bottom: 10px; }
+  .nutrition-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .nutrition-bar-bg { background: var(--beige); border-radius: 4px; height: 8px; overflow: hidden; }
+  .nutrition-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .bar-protein { background: #4CAF50; }
+  .bar-carbs { background: #FF9800; }
+  .bar-fat { background: #2196F3; }
+
+  /* Diet Cards */
+  .diet-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .diet-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .diet-name { font-size: 15px; font-weight: 700; }
+  .diet-category {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+  .cat-low-carb { background: #e8f5e9; color: #2e7d32; }
+  .cat-high-protein { background: #fce4ec; color: #c62828; }
+  .cat-low-fat { background: #e3f2fd; color: #1565c0; }
+  .cat-easy { background: #fff8e1; color: #f57f17; }
+  .cat-lunchbox { background: #f3e5f5; color: #6a1b9a; }
+  .diet-macros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+  .macro-item { text-align: center; background: var(--beige); border-radius: 8px; padding: 6px 4px; }
+  .macro-val { font-size: 14px; font-weight: 700; color: var(--primary-dark); }
+  .macro-lbl { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+  .satiety-row { display: flex; align-items: center; gap: 8px; }
+  .satiety-label { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+  .satiety-bar { flex: 1; background: var(--beige); border-radius: 4px; height: 8px; overflow: hidden; }
+  .satiety-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--primary)); border-radius: 4px; }
+  .satiety-score { font-size: 12px; font-weight: 700; color: var(--primary); flex-shrink: 0; }
+
+  /* Exercise Cards */
+  .exercise-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .exercise-emoji { font-size: 36px; flex-shrink: 0; }
+  .exercise-info { flex: 1; }
+  .exercise-name { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .exercise-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .exercise-target { font-size: 12px; color: var(--text-muted); }
+  .difficulty-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 2px;
+  }
+
+  /* Profile */
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; display: block; }
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    color: var(--text);
+    background: white;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--primary); }
+  .form-select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    color: var(--text);
+    background: white;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    transition: border-color 0.2s;
+  }
+  .form-select:focus { border-color: var(--primary); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-primary {
+    width: 100%;
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+
+  /* Recommendation Result */
+  .result-card {
+    background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+    border: 1.5px solid #a5d6a7;
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    margin-top: 14px;
+  }
+  .result-title { font-size: 14px; font-weight: 700; color: var(--primary-dark); margin-bottom: 12px; }
+  .result-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(165,214,167,0.4);
+    font-size: 13px;
+  }
+  .result-item:last-child { border-bottom: none; }
+  .result-val { font-weight: 700; color: var(--primary-dark); }
+
+  /* Section Header */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .section-title { font-size: 16px; font-weight: 700; }
+  .season-chip {
+    background: var(--primary);
+    color: white;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* Category Filter */
+  .filter-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    scrollbar-width: none;
+  }
+  .filter-scroll::-webkit-scrollbar { display: none; }
+  .filter-btn {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: white;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+  .filter-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  /* Top3 Mini Cards */
+  .top3-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .top3-item {
+    background: rgba(255,255,255,0.2);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    text-align: center;
+  }
+  .top3-emoji { font-size: 24px; }
+  .top3-name { font-size: 11px; font-weight: 600; margin-top: 4px; }
+
+  .divider { height: 1px; background: var(--border); margin: 12px 0; }
+  .text-muted { color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <h1>🌿 오늘의 건강식단 AI</h1>
+    <span class="header-badge" id="seasonBadge">🌞 여름</span>
+  </div>
+  <div class="header-date" id="headerDate"></div>
+</div>
+
+<!-- Tab Panels -->
+<div class="content">
+
+  <!-- 홈 -->
+  <div class="tab-panel active" id="tab-home">
+    <div class="briefing-card">
+      <h2>🌅 오늘의 건강 브리핑</h2>
+      <div class="briefing-message" id="briefingMessage"></div>
+      <div class="top3-grid" id="top3Grid"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🌾</span> 오늘의 제철 식재료 TOP3</div>
+      <div id="homeIngredients"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🍽️</span> 추천 요리</div>
+      <div id="homeRecipes"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🏃</span> 오늘의 운동 추천</div>
+      <div id="homeExercise"></div>
+    </div>
+  </div>
+
+  <!-- 제철 식재료 -->
+  <div class="tab-panel" id="tab-ingredients">
+    <div class="section-header">
+      <div class="section-title">제철 식재료</div>
+      <span class="season-chip" id="ingredientSeasonBadge"></span>
+    </div>
+    <div class="filter-scroll" id="ingredientFilter"></div>
+    <div id="ingredientList"></div>
+  </div>
+
+  <!-- 레시피 -->
+  <div class="tab-panel" id="tab-recipes">
+    <div class="section-header">
+      <div class="section-title">제철 요리 추천</div>
+      <span class="season-chip" id="recipeSeasonBadge"></span>
+    </div>
+    <div id="recipeList"></div>
+  </div>
+
+  <!-- 다이어트 -->
+  <div class="tab-panel" id="tab-diet">
+    <div class="section-header">
+      <div class="section-title">다이어트 요리 추천</div>
+    </div>
+    <div class="filter-scroll" id="dietFilter"></div>
+    <div id="dietList"></div>
+  </div>
+
+  <!-- 운동 -->
+  <div class="tab-panel" id="tab-exercise">
+    <div class="section-header">
+      <div class="section-title">계절별 운동 추천</div>
+      <span class="season-chip" id="exerciseSeasonBadge"></span>
+    </div>
+    <div id="exerciseList"></div>
+  </div>
+
+  <!-- 프로필 -->
+  <div class="tab-panel" id="tab-profile">
+    <div class="card">
+      <div class="card-title"><span>👤</span> 내 프로필 설정</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">성별</label>
+          <select class="form-select" id="pGender">
+            <option value="female">여성</option>
+            <option value="male">남성</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">나이</label>
+          <input type="number" class="form-input" id="pAge" placeholder="나이" min="10" max="99">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">키 (cm)</label>
+          <input type="number" class="form-input" id="pHeight" placeholder="키" min="100" max="250">
+        </div>
+        <div class="form-group">
+          <label class="form-label">현재 체중 (kg)</label>
+          <input type="number" class="form-input" id="pWeight" placeholder="체중" min="30" max="200">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">목표 체중 (kg)</label>
+          <input type="number" class="form-input" id="pGoalWeight" placeholder="목표" min="30" max="200">
+        </div>
+        <div class="form-group">
+          <label class="form-label">활동 수준</label>
+          <select class="form-select" id="pActivity">
+            <option value="1.2">비활동적</option>
+            <option value="1.375">가벼운 활동</option>
+            <option value="1.55" selected>보통 활동</option>
+            <option value="1.725">활동적</option>
+            <option value="1.9">매우 활동적</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="calcRecommendation()">AI 맞춤 추천 받기</button>
+      <div id="profileResult" style="display:none" class="result-card">
+        <div class="result-title">🤖 AI 맞춤 추천 결과</div>
+        <div id="profileResultContent"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- Bottom Nav -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="switchTab('home', this)">
+    <span class="nav-icon">🏠</span>홈
+  </button>
+  <button class="nav-item" onclick="switchTab('ingredients', this)">
+    <span class="nav-icon">🥬</span>제철재료
+  </button>
+  <button class="nav-item" onclick="switchTab('recipes', this)">
+    <span class="nav-icon">🍽️</span>레시피
+  </button>
+  <button class="nav-item" onclick="switchTab('diet', this)">
+    <span class="nav-icon">🥗</span>다이어트
+  </button>
+  <button class="nav-item" onclick="switchTab('exercise', this)">
+    <span class="nav-icon">🏃</span>운동
+  </button>
+  <button class="nav-item" onclick="switchTab('profile', this)">
+    <span class="nav-icon">👤</span>프로필
+  </button>
+</nav>
+
+<script>
+// ─────────────────────────────────────
+// DATA
+// ─────────────────────────────────────
+const SEASON_DATA = {
+  spring: {
+    name: '봄', emoji: '🌸', months: [3,4,5],
+    ingredients: [
+      { emoji:'🥬', name:'봄나물 (냉이)', category:'채소', reason:'봄철 새싹 식물', nutrition:'비타민C, 칼슘, 철분', effects:['면역 강화','피로회복','혈액 정화'], kcal:'18kcal/100g', tags:['비타민C','저칼로리','해독'] },
+      { emoji:'🍓', name:'딸기', category:'과일', reason:'3~5월 제철 과일', nutrition:'비타민C, 안토시아닌, 엽산', effects:['항산화','피부 미용','면역 증진'], kcal:'32kcal/100g', tags:['항산화','피부미용','달콤'] },
+      { emoji:'🦑', name:'주꾸미', category:'수산물', reason:'봄철 산란 전 가장 맛있음', nutrition:'타우린, 단백질, 오메가3', effects:['피로회복','혈압조절','근육 강화'], kcal:'73kcal/100g', tags:['고단백','타우린','저지방'] },
+      { emoji:'🌿', name:'쑥', category:'채소', reason:'봄 대표 향나물', nutrition:'비타민A·K, 철분, 칼슘', effects:['항산화','소화 촉진','혈액 순환'], kcal:'26kcal/100g', tags:['비타민A','항산화','한방'] },
+    ],
+    recipes: [
+      { emoji:'🥗', name:'봄나물 비빔밥', ingredients:'냉이, 쑥갓, 달걀, 참기름, 고추장', kcal:'450kcal', time:'20분', difficulty:'쉬움', reason:'봄 제철 나물을 한번에 섭취, 균형잡힌 영양' },
+      { emoji:'🍲', name:'주꾸미 볶음', ingredients:'주꾸미, 양파, 청양고추, 고추장', kcal:'280kcal', time:'15분', difficulty:'보통', reason:'고단백 저지방으로 다이어트에 최적' },
+      { emoji:'🍵', name:'쑥 된장국', ingredients:'쑥, 된장, 두부, 대파', kcal:'90kcal', time:'10분', difficulty:'쉬움', reason:'저칼로리 해장국, 비타민 보충' },
+    ],
+    exercises: [
+      { emoji:'🚶', name:'공원 걷기', time:'40분', kcal:'160kcal', difficulty:'쉬움', target:'모든 연령', color:'#4CAF50' },
+      { emoji:'🚴', name:'자전거 라이딩', time:'45분', kcal:'280kcal', difficulty:'보통', target:'중장년층 추천', color:'#FF9800' },
+      { emoji:'🧘', name:'스트레칭 & 요가', time:'30분', kcal:'100kcal', difficulty:'쉬움', target:'초보자 추천', color:'#9C27B0' },
+    ]
+  },
+  summer: {
+    name: '여름', emoji: '🌞', months: [6,7,8],
+    ingredients: [
+      { emoji:'🍅', name:'토마토', category:'채소', reason:'여름 대표 채소, 6~8월 최고 맛', nutrition:'리코펜, 비타민C·A, 칼륨', effects:['항산화','피부 보호','혈압 조절'], kcal:'19kcal/100g', tags:['리코펜','항산화','저칼로리'] },
+      { emoji:'🫐', name:'블루베리', category:'과일', reason:'7~8월 제철, 국내산 수확기', nutrition:'안토시아닌, 비타민C·K, 망간', effects:['눈 건강','뇌 기능','항산화'], kcal:'57kcal/100g', tags:['안토시아닌','눈건강','항산화'] },
+      { emoji:'🐟', name:'장어', category:'수산물', reason:'복날 전후 여름 대표 보양 수산물', nutrition:'단백질, 비타민A·B, DHA', effects:['스태미나','피부 미용','피로회복'], kcal:'255kcal/100g', tags:['스태미나','DHA','보양식'] },
+      { emoji:'🌽', name:'옥수수', category:'곡물', reason:'7~8월 수확, 여름 대표 간식', nutrition:'식이섬유, 비타민B, 엽산', effects:['소화 건강','에너지 공급','포만감'], kcal:'86kcal/100g', tags:['식이섬유','에너지','포만감'] },
+      { emoji:'🥒', name:'오이', category:'채소', reason:'여름 제철, 수분 함량 96%', nutrition:'비타민K·C, 수분, 칼륨', effects:['수분 보충','붓기 제거','다이어트'], kcal:'15kcal/100g', tags:['저칼로리','수분보충','다이어트'] },
+      { emoji:'🍉', name:'수박', category:'과일', reason:'여름 최고 과일, 6~8월 최성수기', nutrition:'리코펜, 비타민A·C, 시트룰린', effects:['수분보충','피로회복','심혈관 건강'], kcal:'30kcal/100g', tags:['수분','리코펜','피로회복'] },
+    ],
+    recipes: [
+      { emoji:'🥗', name:'토마토 오이 냉채', ingredients:'토마토, 오이, 양파, 참깨드레싱', kcal:'120kcal', time:'10분', difficulty:'쉬움', reason:'여름 수분 보충, 초저칼로리 다이어트식' },
+      { emoji:'🍜', name:'콩국수', ingredients:'콩, 소면, 오이, 소금', kcal:'380kcal', time:'30분', difficulty:'보통', reason:'고단백 식물성 음식, 여름 대표 보양식' },
+      { emoji:'🫕', name:'장어 구이', ingredients:'장어, 양념장, 깻잎', kcal:'320kcal', time:'25분', difficulty:'보통', reason:'여름 스태미나 보충, 단백질 풍부' },
+      { emoji:'🍱', name:'닭가슴살 옥수수 샐러드', ingredients:'닭가슴살, 옥수수, 토마토, 양상추', kcal:'280kcal', time:'15분', difficulty:'쉬움', reason:'고단백 저지방 도시락 메뉴' },
+      { emoji:'🥣', name:'블루베리 그릭요거트', ingredients:'그릭요거트, 블루베리, 그래놀라', kcal:'210kcal', time:'5분', difficulty:'쉬움', reason:'아침식사 대용, 단백질+항산화 조합' },
+    ],
+    exercises: [
+      { emoji:'🏊', name:'수영', time:'45분', kcal:'350kcal', difficulty:'보통', target:'전신 운동 원하는 분', color:'#2196F3' },
+      { emoji:'🚴', name:'실내 사이클', time:'40분', kcal:'300kcal', difficulty:'보통', target:'무릎 약한 분 추천', color:'#FF9800' },
+      { emoji:'🏋️', name:'아쿠아 에어로빅', time:'50분', kcal:'280kcal', difficulty:'쉬움', target:'중장년 여성 추천', color:'#00BCD4' },
+      { emoji:'🌅', name:'새벽/저녁 조깅', time:'30분', kcal:'250kcal', difficulty:'보통', target:'더위 피해 아침저녁 추천', color:'#4CAF50' },
+    ]
+  },
+  autumn: {
+    name: '가을', emoji: '🍂', months: [9,10,11],
+    ingredients: [
+      { emoji:'🍠', name:'고구마', category:'채소', reason:'가을 수확, 9~11월 제철', nutrition:'베타카로틴, 식이섬유, 비타민C', effects:['장 건강','항산화','포만감'], kcal:'128kcal/100g', tags:['식이섬유','항산화','포만감'] },
+      { emoji:'🍎', name:'사과', category:'과일', reason:'9~11월 국산 사과 수확기', nutrition:'식이섬유, 퀘르세틴, 비타민C', effects:['혈당 조절','다이어트','심장 건강'], kcal:'52kcal/100g', tags:['식이섬유','혈당조절','다이어트'] },
+      { emoji:'🦀', name:'꽃게', category:'수산물', reason:'가을 꽃게 최고 시즌', nutrition:'단백질, 키토산, 아연', effects:['근육 강화','면역 증진','뼈 건강'], kcal:'97kcal/100g', tags:['고단백','키토산','보양'] },
+      { emoji:'🌰', name:'밤', category:'곡물', reason:'9~10월 수확, 가을 대표 견과', nutrition:'탄수화물, 비타민C·B, 칼륨', effects:['에너지 보충','항산화','소화 건강'], kcal:'213kcal/100g', tags:['에너지','비타민C','가을간식'] },
+    ],
+    recipes: [
+      { emoji:'🍲', name:'꽃게탕', ingredients:'꽃게, 무, 청양고추, 된장', kcal:'220kcal', time:'30분', difficulty:'보통', reason:'고단백 저지방 가을 보양식' },
+      { emoji:'🍠', name:'고구마 샐러드', ingredients:'고구마, 사과, 견과류, 플레인 요거트', kcal:'290kcal', time:'15분', difficulty:'쉬움', reason:'포만감 높은 가을 다이어트 샐러드' },
+      { emoji:'🍚', name:'밤밥', ingredients:'찹쌀, 밤, 대추', kcal:'350kcal', time:'40분', difficulty:'쉬움', reason:'가을 제철 재료로 만든 영양 솥밥' },
+    ],
+    exercises: [
+      { emoji:'🏔️', name:'등산', time:'120분', kcal:'600kcal', difficulty:'어려움', target:'체력 좋은 중장년 추천', color:'#795548' },
+      { emoji:'🏃', name:'조깅', time:'40분', kcal:'300kcal', difficulty:'보통', target:'러닝 입문자', color:'#FF5722' },
+      { emoji:'🚴', name:'자전거', time:'50분', kcal:'320kcal', difficulty:'보통', target:'전 연령', color:'#FF9800' },
+    ]
+  },
+  winter: {
+    name: '겨울', emoji: '❄️', months: [12,1,2],
+    ingredients: [
+      { emoji:'🥬', name:'시금치', category:'채소', reason:'겨울 한파에 더 달아지는 채소', nutrition:'철분, 비타민K·A·C, 엽산', effects:['빈혈 예방','뼈 건강','면역 강화'], kcal:'23kcal/100g', tags:['철분','빈혈예방','저칼로리'] },
+      { emoji:'🍊', name:'귤', category:'과일', reason:'11~1월 제주 감귤 최성수기', nutrition:'비타민C, 플라보노이드, 식이섬유', effects:['감기 예방','피부 미용','혈관 건강'], kcal:'53kcal/100g', tags:['비타민C','면역','겨울과일'] },
+      { emoji:'🦪', name:'굴', category:'수산물', reason:'겨울 제철 "바다의 우유"', nutrition:'아연, 타우린, 비타민B12', effects:['면역 강화','피로회복','간 건강'], kcal:'70kcal/100g', tags:['아연','면역','바다우유'] },
+      { emoji:'🥕', name:'당근', category:'채소', reason:'겨울 단단하고 달아지는 제철 채소', nutrition:'베타카로틴, 식이섬유, 비타민K', effects:['눈 건강','항산화','소화 건강'], kcal:'41kcal/100g', tags:['베타카로틴','눈건강','항산화'] },
+    ],
+    recipes: [
+      { emoji:'🍲', name:'시금치 된장국', ingredients:'시금치, 된장, 두부, 멸치육수', kcal:'90kcal', time:'15분', difficulty:'쉬움', reason:'겨울 철분 보충, 초저칼로리' },
+      { emoji:'🫕', name:'굴 미역국', ingredients:'굴, 미역, 들기름, 국간장', kcal:'130kcal', time:'20분', difficulty:'쉬움', reason:'면역 강화 + 칼슘 보충 겨울 보양식' },
+      { emoji:'🥕', name:'당근 견과류 샐러드', ingredients:'당근, 호두, 아몬드, 올리브오일', kcal:'200kcal', time:'10분', difficulty:'쉬움', reason:'항산화 영양 풍부 저칼로리 샐러드' },
+    ],
+    exercises: [
+      { emoji:'🏠', name:'홈트레이닝', time:'40분', kcal:'280kcal', difficulty:'보통', target:'실내 선호하는 모든 분', color:'#607D8B' },
+      { emoji:'🏋️', name:'실내 근력운동', time:'45분', kcal:'250kcal', difficulty:'보통', target:'근육 키우고 싶은 분', color:'#9E9E9E' },
+      { emoji:'🧘', name:'필라테스/요가', time:'50분', kcal:'200kcal', difficulty:'쉬움', target:'유연성 기르고 싶은 분', color:'#E91E63' },
+      { emoji:'⛷️', name:'스키/스노보드', time:'120분', kcal:'500kcal', difficulty:'어려움', target:'스포츠 즐기는 분', color:'#2196F3' },
+    ]
+  }
+};
+
+const DIET_FOODS = [
+  { name:'닭가슴살 샐러드', category:'고단백', emoji:'🥗', kcal:280, protein:35, carbs:12, fat:8, satiety:8 },
+  { name:'두부 스테이크', category:'저탄수화물', emoji:'🥩', kcal:220, protein:18, carbs:6, fat:12, satiety:7 },
+  { name:'연어 아보카도 볼', category:'저탄수화물', emoji:'🍣', kcal:350, protein:25, carbs:15, fat:20, satiety:9 },
+  { name:'오트밀 프로틴볼', category:'고단백', emoji:'🥣', kcal:310, protein:22, carbs:38, fat:8, satiety:8 },
+  { name:'계란흰자 채소볶음', category:'저지방', emoji:'🍳', kcal:180, protein:20, carbs:10, fat:4, satiety:6 },
+  { name:'현미밥 + 된장국', category:'간편식', emoji:'🍚', kcal:400, protein:14, carbs:72, fat:5, satiety:8 },
+  { name:'닭가슴살 도시락', category:'도시락', emoji:'🍱', kcal:450, protein:40, carbs:45, fat:10, satiety:9 },
+  { name:'두부 김치찌개', category:'저지방', emoji:'🫕', kcal:200, protein:15, carbs:12, fat:7, satiety:7 },
+  { name:'그릭요거트 과일볼', category:'간편식', emoji:'🫙', kcal:250, protein:18, carbs:30, fat:6, satiety:7 },
+  { name:'삶은 달걀 채소 도시락', category:'도시락', emoji:'🥚', kcal:350, protein:24, carbs:28, fat:12, satiety:8 },
+];
+
+// ─────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────
+function getSeason() {
+  const m = new Date().getMonth() + 1;
+  if ([3,4,5].includes(m)) return 'spring';
+  if ([6,7,8].includes(m)) return 'summer';
+  if ([9,10,11].includes(m)) return 'autumn';
+  return 'winter';
+}
+
+function formatDate() {
+  const d = new Date();
+  const days = ['일','월','화','수','목','금','토'];
+  return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
+}
+
+// ─────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────
+const season = getSeason();
+const data = SEASON_DATA[season];
+
+function init() {
+  document.getElementById('headerDate').textContent = formatDate();
+  document.getElementById('seasonBadge').textContent = `${data.emoji} ${data.name}`;
+  document.getElementById('ingredientSeasonBadge').textContent = `${data.emoji} ${data.name}`;
+  document.getElementById('recipeSeasonBadge').textContent = `${data.emoji} ${data.name}`;
+  document.getElementById('exerciseSeasonBadge').textContent = `${data.emoji} ${data.name}`;
+  renderHome();
+  renderIngredients();
+  renderRecipes();
+  renderDiet();
+  renderExercise();
+}
+
+function renderHome() {
+  // Briefing message
+  const msgs = {
+    summer: '오늘은 여름 제철 식재료가 풍부한 날이에요! 토마토와 오이로 수분을 보충하고, 장어 구이로 스태미나를 올려보세요. 더운 날씨엔 아침 일찍 수영이나 저녁 조깅을 추천합니다. 💧',
+    spring: '봄나물이 한창 맛있는 시즌이에요! 냉이, 쑥으로 봄철 비타민을 보충하고, 주꾸미로 피로를 풀어보세요. 선선한 날씨에 공원 걷기도 좋아요. 🌸',
+    autumn: '수확의 계절! 고구마와 사과로 하루를 시작해보세요. 꽃게탕으로 고단백 저지방 저녁을, 등산으로 칼로리를 태워보세요. 🍂',
+    winter: '추운 날씨엔 면역 관리가 중요해요! 시금치와 굴로 철분·아연을 보충하고, 따뜻한 실내에서 홈트레이닝으로 체온을 올려보세요. ❄️'
+  };
+  document.getElementById('briefingMessage').textContent = msgs[season];
+
+  // Top3
+  const top3 = data.ingredients.slice(0,3);
+  document.getElementById('top3Grid').innerHTML = top3.map(i => `
+    <div class="top3-item">
+      <div class="top3-emoji">${i.emoji}</div>
+      <div class="top3-name">${i.name.split(' ')[0]}</div>
+    </div>
+  `).join('');
+
+  // Home ingredients (top 3)
+  document.getElementById('homeIngredients').innerHTML = data.ingredients.slice(0,3).map(renderIngredientItem).join('');
+
+  // Home recipes (top 2)
+  document.getElementById('homeRecipes').innerHTML = data.recipes.slice(0,2).map(renderRecipeCard).join('');
+
+  // Home exercise (top 2)
+  document.getElementById('homeExercise').innerHTML = data.exercises.slice(0,2).map(renderExerciseCard).join('');
+}
+
+function renderIngredientItem(item) {
+  return `
+  <div class="ingredient-item">
+    <div class="ingredient-emoji">${item.emoji}</div>
+    <div class="ingredient-info">
+      <div class="ingredient-name">${item.name} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${item.category}</span></div>
+      <div class="ingredient-reason">${item.reason}</div>
+      <div class="tags">${item.tags.map(t=>`<span class="tag green">${t}</span>`).join('')}</div>
+      <div class="kcal-badge">🔥 ${item.kcal}</div>
+    </div>
+  </div>`;
+}
+
+function renderRecipeCard(r) {
+  return `
+  <div class="recipe-card">
+    <div class="recipe-header">
+      <div class="recipe-name">${r.emoji} ${r.name}</div>
+      <div class="recipe-kcal">🔥 ${r.kcal}</div>
+    </div>
+    <div class="recipe-ingredients">재료: ${r.ingredients}</div>
+    <div class="recipe-meta">
+      <span class="meta-chip">⏱ ${r.time}</span>
+      <span class="meta-chip">👨‍🍳 ${r.difficulty}</span>
+    </div>
+    <div class="recipe-reason">${r.reason}</div>
+  </div>`;
+}
+
+function renderExerciseCard(e) {
+  const diffMap = { '쉬움': 1, '보통': 2, '어려움': 3 };
+  const dots = [1,2,3].map(i => `<span class="difficulty-dot" style="background:${i <= diffMap[e.difficulty] ? e.color : '#ddd'}"></span>`).join('');
+  return `
+  <div class="exercise-card">
+    <div class="exercise-emoji">${e.emoji}</div>
+    <div class="exercise-info">
+      <div class="exercise-name">${e.name}</div>
+      <div class="exercise-stats">
+        <span class="meta-chip">⏱ ${e.time}</span>
+        <span class="meta-chip">🔥 ${e.kcal}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--text-muted)">난이도</span> ${dots}
+        <span style="font-size:11px;color:var(--text-muted);margin-left:4px">${e.difficulty}</span>
+      </div>
+      <div class="exercise-target">👤 ${e.target}</div>
+    </div>
+  </div>`;
+}
+
+// Categories for ingredients
+let activeIngredientCat = '전체';
+function renderIngredients() {
+  const cats = ['전체', ...new Set(data.ingredients.map(i=>i.category))];
+  document.getElementById('ingredientFilter').innerHTML = cats.map(c =>
+    `<button class="filter-btn${c===activeIngredientCat?' active':''}" onclick="filterIngredients('${c}')">${c}</button>`
+  ).join('');
+  const filtered = activeIngredientCat === '전체' ? data.ingredients : data.ingredients.filter(i=>i.category===activeIngredientCat);
+  document.getElementById('ingredientList').innerHTML = `
+    <div class="card">${filtered.map(i => `
+      <div class="ingredient-item">
+        <div class="ingredient-emoji">${i.emoji}</div>
+        <div class="ingredient-info">
+          <div class="ingredient-name">${i.name}</div>
+          <div class="ingredient-reason">${i.reason}</div>
+          <div class="tags">${i.tags.map(t=>`<span class="tag green">${t}</span>`).join('')}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">영양: ${i.nutrition}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">효능: ${i.effects.join(' · ')}</div>
+          <div class="kcal-badge">🔥 ${i.kcal}</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+}
+function filterIngredients(cat) {
+  activeIngredientCat = cat;
+  renderIngredients();
+}
+
+function renderRecipes() {
+  document.getElementById('recipeList').innerHTML = data.recipes.map(r => `
+    <div class="card" style="padding:14px">
+      <div class="recipe-header">
+        <div class="recipe-name" style="font-size:16px">${r.emoji} ${r.name}</div>
+        <div class="recipe-kcal">🔥 ${r.kcal}</div>
+      </div>
+      <div class="recipe-ingredients" style="margin-bottom:8px">재료: ${r.ingredients}</div>
+      <div class="recipe-meta">
+        <span class="meta-chip">⏱ ${r.time}</span>
+        <span class="meta-chip">👨‍🍳 ${r.difficulty}</span>
+      </div>
+      <div class="divider"></div>
+      <div class="recipe-reason" style="font-size:13px">${r.reason}</div>
+    </div>`).join('');
+}
+
+let activeDietCat = '전체';
+function renderDiet() {
+  const cats = ['전체','저탄수화물','고단백','저지방','간편식','도시락'];
+  const catClassMap = { '저탄수화물':'cat-low-carb','고단백':'cat-high-protein','저지방':'cat-low-fat','간편식':'cat-easy','도시락':'cat-lunchbox' };
+  document.getElementById('dietFilter').innerHTML = cats.map(c =>
+    `<button class="filter-btn${c===activeDietCat?' active':''}" onclick="filterDiet('${c}')">${c}</button>`
+  ).join('');
+  const filtered = activeDietCat === '전체' ? DIET_FOODS : DIET_FOODS.filter(d=>d.category===activeDietCat);
+  document.getElementById('dietList').innerHTML = filtered.map(d => `
+    <div class="diet-card">
+      <div class="diet-card-header">
+        <div class="diet-name">${d.emoji} ${d.name}</div>
+        <span class="diet-category ${catClassMap[d.category]||'cat-easy'}">${d.category}</span>
+      </div>
+      <div class="diet-macros">
+        <div class="macro-item"><div class="macro-val">🔥${d.kcal}</div><div class="macro-lbl">칼로리</div></div>
+        <div class="macro-item"><div class="macro-val" style="color:#e53935">${d.protein}g</div><div class="macro-lbl">단백질</div></div>
+        <div class="macro-item"><div class="macro-val" style="color:#f57c00">${d.carbs}g</div><div class="macro-lbl">탄수화물</div></div>
+        <div class="macro-item"><div class="macro-val" style="color:#1976d2">${d.fat}g</div><div class="macro-lbl">지방</div></div>
+      </div>
+      <div class="satiety-row">
+        <span class="satiety-label">포만감</span>
+        <div class="satiety-bar"><div class="satiety-fill" style="width:${d.satiety*10}%"></div></div>
+        <span class="satiety-score">${d.satiety}/10</span>
+      </div>
+    </div>`).join('');
+}
+function filterDiet(cat) {
+  activeDietCat = cat;
+  renderDiet();
+}
+
+function renderExercise() {
+  document.getElementById('exerciseList').innerHTML = data.exercises.map(e => renderExerciseCard(e)).join('');
+}
+
+// ─────────────────────────────────────
+// PROFILE / CALCULATOR
+// ─────────────────────────────────────
+function calcRecommendation() {
+  const gender = document.getElementById('pGender').value;
+  const age = +document.getElementById('pAge').value;
+  const height = +document.getElementById('pHeight').value;
+  const weight = +document.getElementById('pWeight').value;
+  const goal = +document.getElementById('pGoalWeight').value;
+  const activity = +document.getElementById('pActivity').value;
+
+  if (!age || !height || !weight || !goal) {
+    alert('모든 항목을 입력해주세요.');
+    return;
+  }
+
+  // Harris-Benedict BMR
+  let bmr;
+  if (gender === 'male') {
+    bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
+  } else {
+    bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
+  }
+  const tdee = Math.round(bmr * activity);
+  const targetKcal = goal < weight ? tdee - 500 : tdee + 200;
+  const protein = Math.round(weight * 1.6);
+  const bmi = (weight / ((height/100) ** 2)).toFixed(1);
+  const diff = weight - goal;
+
+  let bmiLabel = '';
+  if (bmi < 18.5) bmiLabel = '저체중';
+  else if (bmi < 23) bmiLabel = '정상';
+  else if (bmi < 25) bmiLabel = '과체중';
+  else bmiLabel = '비만';
+
+  const recipeRec = goal < weight
+    ? `${data.recipes[0].emoji} ${data.recipes[0].name}, 닭가슴살 샐러드`
+    : `${data.recipes[1]?.emoji||'🍽️'} ${data.recipes[1]?.name||'균형 잡힌 식단'}, 고단백 식단`;
+
+  document.getElementById('profileResultContent').innerHTML = `
+    <div class="result-item"><span>현재 BMI</span><span class="result-val">${bmi} (${bmiLabel})</span></div>
+    <div class="result-item"><span>하루 유지 칼로리</span><span class="result-val">${tdee} kcal</span></div>
+    <div class="result-item"><span>목표 달성 칼로리</span><span class="result-val">${targetKcal} kcal</span></div>
+    <div class="result-item"><span>권장 단백질</span><span class="result-val">${protein}g/일</span></div>
+    <div class="result-item"><span>체중 변화 목표</span><span class="result-val">${diff > 0 ? '-' : '+'}${Math.abs(diff)}kg</span></div>
+    <div class="result-item"><span>추천 식단</span><span class="result-val" style="font-size:12px;text-align:right;max-width:60%">${recipeRec}</span></div>
+    <div class="result-item"><span>추천 운동</span><span class="result-val">${data.exercises[0].emoji} ${data.exercises[0].name}</span></div>
+    <div style="margin-top:12px;padding:10px;background:rgba(45,122,79,0.08);border-radius:8px;font-size:12px;color:var(--primary-dark);line-height:1.6">
+      💡 ${diff > 0 ? `목표 체중까지 ${Math.abs(diff)}kg 감량이 필요합니다. 하루 ${targetKcal}kcal 식사와 규칙적인 운동을 병행해보세요.` : `건강한 체중 유지를 위해 균형 잡힌 식사와 꾸준한 운동이 중요합니다.`}
+    </div>`;
+  document.getElementById('profileResult').style.display = 'block';
+}
+
+// ─────────────────────────────────────
+// TAB NAVIGATION
+// ─────────────────────────────────────
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tabId).classList.add('active');
+  btn.classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+init();
+</script>
+</body>
+</html>
